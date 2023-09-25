@@ -31,7 +31,6 @@ import { TSymbol } from '@/hooks/MenuContext'
 const allSymbols: TSymbol[] = [...forexList, ...indexList]
 
 const useSymbolSearch = (str: string) => {
-  console.log('useSymbolSearch', str)
   return (
     allSymbols.filter(
       (item) =>

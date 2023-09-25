@@ -7,6 +7,7 @@ import React, {
   useState,
   ReactNode,
   useEffect,
+  useRef,
 } from 'react'
 
 export type TSymbol = {
@@ -25,6 +26,9 @@ const MenuContext = createContext<{
   setSymbolInfo: (symbol: TSymbol) => void
   startDate: Date | undefined
   setStartDate: (date: Date | undefined) => void
+  bps: number
+  setBps: (bps: number) => void
+  dataIndex: React.MutableRefObject<number>
 }>({
   playing: false,
   togglePlaying: () => {},
@@ -36,8 +40,11 @@ const MenuContext = createContext<{
     exchangeShortName: 'INDEX',
   },
   setSymbolInfo: () => {},
-  startDate: new Date(),
+  startDate: dayjs('2023-09-01').startOf('day').toDate(),
   setStartDate: () => {},
+  bps: 5,
+  setBps: () => {},
+  dataIndex: { current: 0 },
 })
 
 // Step 3: Create a function to Menu the state variable
@@ -60,9 +67,16 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
     dayjs().startOf('day').toDate(),
   )
 
+  // bars per second
+  const [bps, setBps] = useState(5)
+
+  const dataIndex = useRef(0)
+
   useEffect(() => {
     setPlaying(false)
+    dataIndex.current = 0
   }, [startDate, symbolInfo])
+
   // Step 2: Define a context provider component
   return (
     <MenuContext.Provider
@@ -73,6 +87,9 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
         setSymbolInfo,
         startDate,
         setStartDate,
+        bps,
+        setBps,
+        dataIndex,
       }}
     >
       {children}

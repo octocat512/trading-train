@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import TradingViewChart from '@/components/TradingViewChart'
-import Menu from '@/components/Menu'
+import Toolbar from '@/components/Toolbar'
 import { MenuProvider } from '@/hooks/MenuContext'
 import {
   useQuery,
@@ -11,7 +11,7 @@ import {
   useQueryClient,
   QueryClient,
   QueryClientProvider,
-} from 'react-query'
+} from '@tanstack/react-query'
 
 const queryClient = new QueryClient()
 
@@ -20,7 +20,7 @@ export default function Home() {
     <QueryClientProvider client={queryClient}>
       <main className="flex min-h-screen flex-col">
         <MenuProvider>
-          <Menu />
+          <Toolbar />
           <TradingViewChart />
         </MenuProvider>
       </main>
