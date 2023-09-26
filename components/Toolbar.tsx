@@ -10,6 +10,7 @@ import { Slider } from './ui/slider'
 import BarBackIcon from '@/icons/BarBack'
 import BarForwardIcon from '@/icons/BarForward'
 import { eventBus } from './TradingViewChart'
+import { TimeFramePicker } from './TimeFramePicker'
 
 export default function Toolbar() {
   const {
@@ -22,11 +23,15 @@ export default function Toolbar() {
     bps,
     setBps,
     dataIndex,
+    interval,
+    setInterval,
   } = useMenu()
 
   return (
     <div className="relative z-10 px-2 py-2 flex items-center space-x-2">
       <SymbolSearchBox selectedSymbol={symbolInfo} onSelect={setSymbolInfo} />
+
+      <TimeFramePicker value={interval} onSelect={setInterval} />
 
       <Button
         autoFocus={true}

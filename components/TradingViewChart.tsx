@@ -20,7 +20,6 @@ import { usePrevious } from 'react-use'
 import { useMenu } from '../hooks/MenuContext'
 import axios from 'axios'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { Button } from './ui/button'
 
 // Event Bus implementation
 class EventBus {
@@ -50,14 +49,6 @@ class EventBus {
 }
 
 export const eventBus = new EventBus()
-
-export enum CHART_PERIODS {
-  '15m' = '15m',
-  '1H' = '1H',
-  '4H' = '4H',
-  '1D' = '1D',
-  '1W' = '1W',
-}
 
 declare global {
   interface Window {
@@ -102,13 +93,56 @@ const CandleOption: DeepPartial<ChartOptions> = {
     rightOffset: 15,
     borderVisible: false,
   },
+  handleScale: false,
 }
 
 type Bar = OhlcData & {
   date: string
 }
 
-const getBars = async (ticker: string, from: number, to: number) => {
+const intervalToQuery: { [key: string]: string } = {
+  '1m': '1min',
+  '5m': '5min',
+  '15m': '15min',
+  '30m': '30min',
+  '1h': '1hour',
+  '4h': '4hour',
+  '1d': '1day',
+  '1w': '1week',
+}
+
+const BARS_COUNT_PER_LOAD = 1000
+const calculateDaysByInterval = (interval: string) => {
+  switch (interval) {
+    case '1m':
+      return 1 / 24 / 60
+    case '5m':
+      return 5 / 24 / 60
+    case '15m':
+      return 15 / 24 / 60
+    case '30m':
+      return 30 / 24 / 60
+    case '1h':
+      return 1 / 24
+    case '4h':
+      return 4 / 24
+    case '1d':
+      return 1
+    case '1w':
+      return 7
+    default:
+      return 1
+  }
+}
+
+Math.ceil(BARS_COUNT_PER_LOAD * calculateDaysByInterval('1m'))
+
+const getBars = async (
+  ticker: string,
+  interval: string,
+  from: number,
+  to: number,
+) => {
   const urlParameters: { [key: string]: string } = {
     from: dayjs(from).format('YYYY-MM-DD'),
     to: dayjs(to).format('YYYY-MM-DD'),
@@ -118,9 +152,18 @@ const getBars = async (ticker: string, from: number, to: number) => {
     .map((name) => `${name}=${encodeURIComponent(urlParameters[name])}`)
     .join('&')
 
-  const { data } = await axios.get(
-    `https://financialmodelingprep.com/api/v3/historical-chart/5min/${ticker}?apikey=d4148d98b1d826e0738004faf147f784&${query}`,
-  )
+  let data
+  if (interval === '1d' || interval === '1w') {
+    const { data: t } = await axios.get(
+      `https://financialmodelingprep.com/api/v3/historical-price-full/${ticker}?apikey=d4148d98b1d826e0738004faf147f784&${query}`,
+    )
+    data = t.historical
+  } else {
+    const { data: t } = await axios.get(
+      `https://financialmodelingprep.com/api/v3/historical-chart/${intervalToQuery[interval]}/${ticker}?apikey=d4148d98b1d826e0738004faf147f784&${query}`,
+    )
+    data = t
+  }
 
   data?.forEach((item: Bar) => {
     item.time = (new Date(item.date).valueOf() / 1_000) as UTCTimestamp
@@ -135,26 +178,53 @@ const getBars = async (ticker: string, from: number, to: number) => {
     ?.reverse()
 }
 
-const useBars = (ticker: string, from: number, to: number) => {
-  return useQuery<Bar[]>(['bars', ticker, from, to], () =>
-    getBars(ticker, from, to),
+const useBars = (
+  ticker: string,
+  interval: string,
+  from: number,
+  to: number,
+) => {
+  return useQuery<Bar[]>(['bars', ticker, interval, from, to], () =>
+    getBars(ticker, interval, from, to),
   )
 }
 
-const useInfiniteBars = (ticker: string, from: number) => {
-  const { data, ...rest } = useInfiniteQuery<Bar[]>({
-    queryKey: ['infinite-bars', ticker, from],
+const usePrevBars = (ticker: string, interval: string, to: number) => {
+  const intervalDays =
+    2 * Math.ceil(BARS_COUNT_PER_LOAD * calculateDaysByInterval(interval))
+
+  return useQuery<Bar[]>(['bars', ticker, interval, to], () =>
+    getBars(ticker, interval, to - 1000 * 60 * 60 * 24 * intervalDays, to),
+  )
+}
+
+const useInfiniteBars = (ticker: string, interval: string, from: number) => {
+  const intervalDays =
+    2 * Math.ceil(BARS_COUNT_PER_LOAD * calculateDaysByInterval(interval))
+
+  const { data, ...rest } = useInfiniteQuery<{
+    bars: Bar[]
+    from: number
+    to: number
+  }>({
+    queryKey: ['infinite-bars', ticker, interval, from],
     queryFn: async ({ pageParam = 1 }) => {
-      return await getBars(
-        ticker,
-        from + (pageParam - 1) * 1000 * 60 * 60 * 24 * 7,
+      const f = from + (pageParam - 1) * 1000 * 60 * 60 * 24 * intervalDays
+      const t =
         from +
-          (pageParam - 1) * 1000 * 60 * 60 * 24 * 7 +
-          1000 * 60 * 60 * 24 * 6,
-      )
+        (pageParam - 1) * 1000 * 60 * 60 * 24 * intervalDays +
+        1000 * 60 * 60 * 24 * (intervalDays - 1)
+
+      const bars = await getBars(ticker, interval, f, t)
+      return {
+        bars: bars,
+        from: f,
+        to: t,
+      }
     },
     getNextPageParam: (lastPage, pages) => {
-      if (lastPage.length === 0) return undefined
+      const current = dayjs().valueOf()
+      if (current >= lastPage.from && current <= lastPage.to) return undefined
       return pages.length + 1
     },
     getPreviousPageParam: (firstPage, allPages) => {
@@ -163,22 +233,30 @@ const useInfiniteBars = (ticker: string, from: number) => {
   })
 
   return {
-    data: data?.pages.flat(),
+    data: data?.pages.map((p) => p.bars).flat(),
     ...rest,
   }
 }
 
 const TradingViewChart = () => {
-  const { playing, togglePlaying, startDate, symbolInfo, bps, dataIndex } =
-    useMenu()
-  const { data: prevData } = useBars(
+  const {
+    playing,
+    togglePlaying,
+    startDate,
+    symbolInfo,
+    bps,
+    dataIndex,
+    interval,
+  } = useMenu()
+  const { data: prevData } = usePrevBars(
     symbolInfo.symbol,
-    dayjs(startDate).subtract(7, 'day').valueOf(),
+    interval,
     dayjs(startDate).subtract(1, 'day').valueOf(),
   )
 
   const barsQuery = useInfiniteBars(
     symbolInfo.symbol,
+    interval,
     dayjs(startDate).valueOf(),
   )
 
@@ -207,9 +285,13 @@ const TradingViewChart = () => {
 
   const startDatePrev = usePrevious(startDate)
   const symbolInfoPrev = usePrevious(symbolInfo)
+  const intervalPrev = usePrevious(interval)
+
   React.useEffect(() => {
     if (
-      (startDate !== startDatePrev || symbolInfo !== symbolInfoPrev) &&
+      (startDate !== startDatePrev ||
+        symbolInfo !== symbolInfoPrev ||
+        interval !== intervalPrev) &&
       chartCreated
     ) {
       // remove the tooltip element
@@ -217,7 +299,15 @@ const TradingViewChart = () => {
       chartCreated.remove()
       setChartCreated(null)
     }
-  }, [chartCreated, startDate, startDatePrev, symbolInfo, symbolInfoPrev])
+  }, [
+    chartCreated,
+    startDate,
+    startDatePrev,
+    symbolInfo,
+    symbolInfoPrev,
+    interval,
+    intervalPrev,
+  ])
 
   // if no chart created yet, create one with options and add to DOM manually
   useEffect(() => {

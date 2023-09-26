@@ -29,6 +29,8 @@ const MenuContext = createContext<{
   bps: number
   setBps: (bps: number) => void
   dataIndex: React.MutableRefObject<number>
+  interval: string
+  setInterval: (i: string) => void
 }>({
   playing: false,
   togglePlaying: () => {},
@@ -45,6 +47,8 @@ const MenuContext = createContext<{
   bps: 5,
   setBps: () => {},
   dataIndex: { current: 0 },
+  interval: '5m',
+  setInterval: () => {},
 })
 
 // Step 3: Create a function to Menu the state variable
@@ -77,6 +81,7 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
     dataIndex.current = 0
   }, [startDate, symbolInfo])
 
+  const [interval, setInterval] = useState('5m')
   // Step 2: Define a context provider component
   return (
     <MenuContext.Provider
@@ -90,6 +95,8 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
         bps,
         setBps,
         dataIndex,
+        interval,
+        setInterval,
       }}
     >
       {children}
