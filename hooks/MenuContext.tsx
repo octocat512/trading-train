@@ -35,11 +35,11 @@ const MenuContext = createContext<{
   playing: false,
   togglePlaying: () => {},
   symbolInfo: {
-    symbol: 'XU100.IS',
-    name: 'BIST 100',
-    currency: 'TRY',
-    stockExchange: 'Istanbul',
-    exchangeShortName: 'INDEX',
+    symbol: 'ARSMXN',
+    name: 'ARS/MXN',
+    currency: 'MXN',
+    stockExchange: 'CCY',
+    exchangeShortName: 'FOREX',
   },
   setSymbolInfo: () => {},
   startDate: dayjs('2023-09-01').startOf('day').toDate(),
@@ -60,11 +60,11 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const [symbolInfo, setSymbolInfo] = useState({
-    symbol: 'XU100.IS',
-    name: 'BIST 100',
-    currency: 'TRY',
-    stockExchange: 'Istanbul',
-    exchangeShortName: 'INDEX',
+    symbol: 'ARSMXN',
+    name: 'ARS/MXN',
+    currency: 'MXN',
+    stockExchange: 'CCY',
+    exchangeShortName: 'FOREX',
   })
 
   const [startDate, setStartDate] = useState<Date | undefined>(

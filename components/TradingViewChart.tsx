@@ -15,11 +15,15 @@ import {
   ISeriesApi,
   LineStyle,
   OhlcData,
+  Time,
 } from 'lightweight-charts'
 import { usePrevious } from 'react-use'
 import { useMenu } from '../hooks/MenuContext'
 import axios from 'axios'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import utc from 'dayjs/plugin/utc'
+
+dayjs.extend(utc)
 
 // Event Bus implementation
 class EventBus {
@@ -109,6 +113,7 @@ const intervalToQuery: { [key: string]: string } = {
   '4h': '4hour',
   '1d': '1day',
   '1w': '1week',
+  '1M': '1month',
 }
 
 const BARS_COUNT_PER_LOAD = 1000
@@ -129,13 +134,13 @@ const calculateDaysByInterval = (interval: string) => {
     case '1d':
       return 1
     case '1w':
-      return 7
+      return 1
+    case '1M':
+      return 1
     default:
       return 1
   }
 }
-
-Math.ceil(BARS_COUNT_PER_LOAD * calculateDaysByInterval('1m'))
 
 const getBars = async (
   ticker: string,
@@ -153,39 +158,133 @@ const getBars = async (
     .join('&')
 
   let data
-  if (interval === '1d' || interval === '1w') {
+
+  if (interval === '1M') {
     const { data: t } = await axios.get(
       `https://financialmodelingprep.com/api/v3/historical-price-full/${ticker}?apikey=d4148d98b1d826e0738004faf147f784&${query}`,
     )
     data = t.historical
+
+    let monthlyBars: Bar[] = []
+    let currentWeek: Bar = {
+      time: 0 as Time,
+      open: 0,
+      high: 0,
+      low: 0,
+      close: 0,
+      date: '',
+    }
+
+    const getFirstDayOfMonth = (date: string) => {
+      return dayjs.utc(date).startOf('month').valueOf()
+    }
+
+    data?.reverse().forEach((dailyBar: Bar) => {
+      let x = getFirstDayOfMonth(dailyBar.date)
+
+      if (currentWeek.date === '') {
+        // Initialize the current week
+        currentWeek.open = dailyBar.open
+        currentWeek.high = dailyBar.high
+        currentWeek.low = dailyBar.low
+        currentWeek.close = dailyBar.close
+        currentWeek.date = dailyBar.date
+      } else if (getFirstDayOfMonth(currentWeek.date) === x) {
+        // Update the current week
+        currentWeek.high = Math.max(currentWeek.high, dailyBar.high)
+        currentWeek.low = Math.min(currentWeek.low, dailyBar.low)
+        currentWeek.close = dailyBar.close
+      } else {
+        // Add the current week to the weekly bars array
+        monthlyBars.push(currentWeek)
+
+        // Initialize the new current week
+        currentWeek = {
+          time: 0 as Time,
+          open: 0,
+          high: 0,
+          low: 0,
+          close: 0,
+          date: '',
+        }
+      }
+    })
+
+    data = monthlyBars
+  } else if (interval === '1w') {
+    const { data: t } = await axios.get(
+      `https://financialmodelingprep.com/api/v3/historical-price-full/${ticker}?apikey=d4148d98b1d826e0738004faf147f784&${query}`,
+    )
+    data = t.historical
+
+    let weeklyBars: Bar[] = []
+    let currentWeek: Bar = {
+      time: 0 as Time,
+      open: 0,
+      high: 0,
+      low: 0,
+      close: 0,
+      date: '',
+    }
+
+    const getWeek = (date: string) => {
+      return Math.floor(dayjs(date).valueOf() / (1_000 * 60 * 60 * 24 * 7))
+    }
+
+    data?.reverse().forEach((dailyBar: Bar) => {
+      let x = getWeek(dailyBar.date)
+
+      if (currentWeek.date === '') {
+        // Initialize the current week
+        currentWeek.open = dailyBar.open
+        currentWeek.high = dailyBar.high
+        currentWeek.low = dailyBar.low
+        currentWeek.close = dailyBar.close
+        currentWeek.date = dailyBar.date
+      } else if (getWeek(currentWeek.date) === x) {
+        // Update the current week
+        currentWeek.high = Math.max(currentWeek.high, dailyBar.high)
+        currentWeek.low = Math.min(currentWeek.low, dailyBar.low)
+        currentWeek.close = dailyBar.close
+      } else {
+        // Add the current week to the weekly bars array
+        weeklyBars.push(currentWeek)
+
+        // Initialize the new current week
+        currentWeek = {
+          time: 0 as Time,
+          open: 0,
+          high: 0,
+          low: 0,
+          close: 0,
+          date: '',
+        }
+      }
+    })
+
+    data = weeklyBars
+  } else if (interval === '1d') {
+    const { data: t } = await axios.get(
+      `https://financialmodelingprep.com/api/v3/historical-price-full/${ticker}?apikey=d4148d98b1d826e0738004faf147f784&${query}`,
+    )
+    data = t.historical
+    data = data?.reverse()
   } else {
     const { data: t } = await axios.get(
       `https://financialmodelingprep.com/api/v3/historical-chart/${intervalToQuery[interval]}/${ticker}?apikey=d4148d98b1d826e0738004faf147f784&${query}`,
     )
     data = t
+    data = data?.reverse()
   }
 
   data?.forEach((item: Bar) => {
     item.time = (new Date(item.date).valueOf() / 1_000) as UTCTimestamp
   })
 
-  return data
-    ?.filter(
-      (item: Bar) =>
-        (item.time as number) * 1000 >= from &&
-        (item.time as number) * 1000 < to + 1000 * 60 * 60 * 24,
-    )
-    ?.reverse()
-}
-
-const useBars = (
-  ticker: string,
-  interval: string,
-  from: number,
-  to: number,
-) => {
-  return useQuery<Bar[]>(['bars', ticker, interval, from, to], () =>
-    getBars(ticker, interval, from, to),
+  return data?.filter(
+    (item: Bar) =>
+      (item.time as number) * 1000 >= from &&
+      (item.time as number) * 1000 < to + 1000 * 60 * 60 * 24,
   )
 }
 

@@ -101,13 +101,20 @@ export function TimeFramePicker({
           >
             <strong>1 day</strong>
           </DropdownMenuItem>
-          {/* <DropdownMenuItem
+          <DropdownMenuItem
             onClick={() => {
               onSelect(`1w`)
             }}
           >
             <strong>1 week</strong>
-          </DropdownMenuItem> */}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              onSelect(`1M`)
+            }}
+          >
+            <strong>1 month</strong>
+          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
       </DropdownMenuContent>
