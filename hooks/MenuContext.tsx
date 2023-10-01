@@ -60,9 +60,9 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const [symbolInfo, setSymbolInfo] = useState({
-    symbol: 'ARSMXN',
-    name: 'ARS/MXN',
-    currency: 'MXN',
+    symbol: 'EURUSD',
+    name: 'EUR/USD',
+    currency: 'USD',
     stockExchange: 'CCY',
     exchangeShortName: 'FOREX',
   })

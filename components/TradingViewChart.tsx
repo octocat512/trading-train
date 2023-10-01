@@ -67,7 +67,7 @@ const CandleOption: DeepPartial<ChartOptions> = {
     // Vertical crosshair line (showing Date in Label)
     vertLine: {
       // @ts-ignore
-      width: 20,
+      // width: 20,
       color: '#C3BCDB44',
       style: LineStyle.Solid,
       labelBackgroundColor: '#9B7DFF',
@@ -97,7 +97,7 @@ const CandleOption: DeepPartial<ChartOptions> = {
     rightOffset: 15,
     borderVisible: false,
   },
-  handleScale: false,
+  // handleScale: false,
 }
 
 type Bar = OhlcData & {
@@ -116,7 +116,7 @@ const intervalToQuery: { [key: string]: string } = {
   '1M': '1month',
 }
 
-const BARS_COUNT_PER_LOAD = 1000
+const BARS_COUNT_PER_LOAD = 300
 const calculateDaysByInterval = (interval: string) => {
   switch (interval) {
     case '1m':
